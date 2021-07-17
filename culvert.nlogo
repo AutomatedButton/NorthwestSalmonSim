@@ -1,6 +1,8 @@
 globals[
   money ;; int representing how much money the player has
   current-culvert ;; the currently selected culvert
+  notes ;; string representing any notes about the game while it is being played
+  time ;; int representing how many ticks have passed in this simulation
 
   ;; patch agentsets
   node ;; agentset containing patches that are nodes?
@@ -9,12 +11,15 @@ globals[
 turtles-own[
   age ;; int representing the number of ticks this salmon has been alive
   stage-life-cycle ;; int representing the stage of the salmon's life cycle
+  is-laying-eggs ;; bool representing if a salmon is currently laying eggs
+  personal-timer ;; int representing how many ticks this salmon has left until the next stage of its life
 ]
 
 patches-own[
   depth ;; int representing depth in the system?
   max-fish ;; int representing how many salmon can be in this part of the river at any given time
   current-eggs ;; int representing how many salmon eggs are currently here
+  max-eggs ;; int representing how many salmon eggs can be stored in this piece of water
   current-fish ;; int representing how many salmon are currently in this piece of water
   culvert? ;; bool that is true iff there is an unfixed culvert in this piece of water
   price-to-fix ;; int that represents how much it would cost to fix this particular culvert
@@ -23,12 +28,14 @@ patches-own[
 
 to setup
   clear-all;
-
+  set-default-shape turtles "fish"
+  set-patch-size 7;
+  resize-world -40 40 -40 40;
   setup-globals
   setup-patches
   ask node with [pycor = -9 and pxcor = 0][become-current]
   ;; Create all of the turtles
-  create-turtles 5 [
+  create-turtles 10 [
     setup-fish
   ]
   print node
@@ -37,13 +44,31 @@ end
 
 to go
   set money money + 1;
+  set time time + 1;
   ask turtles[ move-fish ];
+  ask turtles[ if age > 50 [ die ] ]
+  ask turtles[ fish-predation ]
+ ;;Trying to get this working, need some way of getting a list containing each turtle
+  (foreach filter [ x -> [is-laying-eggs = true] of x] [self] of turtles
+    [ x ->
+      create-turtles 2 [
+        set age 0;
+        set stage-life-cycle 0;
+        set is-laying-eggs false;
+        move-to [patch-here] of x
+      ]
+  ] )
+  ask turtles[
+    set is-laying-eggs false
+    if personal-timer != -1 [ set personal-timer personal-timer - 1 ] ]
+  if time = 100 [print notes]
   tick
 end
 
 to setup-globals
   clear-all
   set money 0;
+  set notes "\n";
 end
 
 to setup-patches
@@ -54,13 +79,21 @@ to setup-patches
 
   ;; Set which tiles are nodes
   set node patches with [
-    (pycor >= -10 and pycor <= -1 and pxcor = 0)
+    (pycor >= -10 and pycor <= 1 and pxcor = 0)
     or (pxcor = 1 and (pycor = -8 or pycor = -7))
     or (pxcor = 2 and (pycor = -7 or pycor = -6))
     or (pxcor = 3 and pycor >= -6 and pycor <= -2)
     or (pxcor >= 3 and pxcor <= 5 and pycor = -5)
     or (pxcor >= 1 and pxcor <= 2 and pycor = -2)
+    or (pxcor <= -1 and pxcor >= -2 and pycor = -5)
+    or (pxcor <= -2 and pxcor >= -3 and pycor = -4)
+    or (pxcor = -3 and pycor >= -3 and pycor <= -1)
+    or (pxcor = -4 or pxcor = -2 and pycor = -1)
+    or (pxcor <= -4 and pxcor >= -5 and pycor = 0)
+    or (pxcor <= -5 and pxcor >= -6 and pycor = 1)
+    or (pxcor = -2 and pycor >= 0 and pycor <= 2)
     or ((pxcor >= -2 and pxcor <= 2) and (pycor >= -11 and pycor <= -10))
+    or (pxcor = 5 and pycor >= -4 and pycor <= 3)
   ]
 
   ;; Setting up baselines for every node
@@ -69,6 +102,7 @@ to setup-patches
     set accessable? true;
     set current-fish 0;
     set current-eggs 0;
+    set max-eggs 0;
     set max-fish 10;
     set culvert? false;
     set price-to-fix 0;
@@ -90,7 +124,8 @@ end
 
 to setup-fish
   set age 0;
-  set stage-life-cycle 0;
+  set stage-life-cycle 2;
+  set is-laying-eggs false;
   put-on-empty-node
 end
 
@@ -99,9 +134,21 @@ to set-particular-nodes
   ask node with [
     (pycor = -9 and pxcor = 0)
   or (pycor = -5 and pxcor = 3)
-  or (pycor = -3 and pxcor = 0) ][
+  or (pycor = 0 and pxcor = 0)
+  or (pycor = -3 and pxcor = 0)
+  or (pycor = -5 and pxcor = 0)
+  or (pycor = -3 and pxcor = 5)
+  or (pycor = -5 and pxcor = 5)
+  or (pycor = -4 and pxcor = -3)
+  or (pycor = -1 and pxcor = -2)][
     set culvert? true;
-    set price-to-fix 100;
+    set price-to-fix 15;
+  ]
+  ask node with [
+    (pycor = 1 and pxcor = 0)
+  ][
+    set max-eggs 5;
+    set pcolor black
   ]
 
 end
@@ -136,32 +183,56 @@ to fix-culvert ;; patch procedure
     if money >= price-to-fix [
       set pcolor blue
       set culvert? false
+      set money money - price-to-fix
       set price-to-fix 0
+      set notes (word notes "culvert on " pycor "," pxcor " fixed on tick #" time "\n")
     ]
   ]
 end
 
 to move-fish ;; turtle procedure
-  ;; Movement rules for a fish going to to the base of the river system
+  ;; Handles fish that have just been spawned
   (ifelse stage-life-cycle = 0 [
-    ask self [ move-upstream ]
-
+    if age > 10 [
+      set stage-life-cycle 1
+    ]
+  ]
+    ;; Movement rules for a fish going to to the base of the river system
+  stage-life-cycle = 1 [
+      ask self [ move-downstream ]
+      if [depth] of patch-here = 0 [
+        set stage-life-cycle 2
+      ]
   ]
     ;; Movement rules for a fish going to try to lay eggs
-  stage-life-cycle = 1 [
-
+  stage-life-cycle = 2 [
+      ask self [ move-upstream ]
+      if [current-eggs] of patch-here < [max-eggs] of patch-here [
+        set is-laying-eggs true
+        set stage-life-cycle 3
+      ]
   ]
     ;; Movement rules for a fish going to live the rest of its life after laying eggs
-  stage-life-cycle = 2 [
+  stage-life-cycle = 3 [
       ask self [ move-random ]
+      (ifelse personal-timer = -1 [ set personal-timer 3 ]
+        personal-timer = 0 [ die ])
   ])
   set age age + 1
 end
 
 to move-upstream ;; turtle procedure
   let depth-here [depth] of patch-here
-  let x random count neighbors4 with [depth-here <= depth]
-  let suitable-neighbors  neighbors4 with [depth-here <= depth]
+  let suitable-neighbors neighbors4 with [depth-here <= depth]
+  carefully [
+  move-to one-of suitable-neighbors with [member? self node and [culvert?] of self = false]
+  ] [ask self[ move-random ] ]
+
+end
+
+to move-downstream ;; turtle procedure
+  let depth-here [depth] of patch-here
+  let suitable-neighbors neighbors4 with [depth-here >= depth]
   carefully [
   move-to one-of suitable-neighbors with [member? self node and [culvert?] of self = false]
   ] [ask self[ move-random ] ]
@@ -207,6 +278,19 @@ to move-random ;; turtle procedure
   ])
 
 end
+
+to lay-eggs ;; turtle procedure
+
+end
+
+to fish-predation
+  let rng random 100
+
+  ifelse stage-life-cycle = 1 and [depth = 0] of patch-here = true [
+    if rng <= 1 [die]
+  ] [ if rng = 0 [ die ] ]
+end
+
 to put-on-empty-node ;; Maybe just move-to a specific node (the base node)
   move-to one-of node with [accessable? and (current-fish < max-fish)]
 end
@@ -214,11 +298,11 @@ end
 GRAPHICS-WINDOW
 210
 10
-647
-448
+785
+586
 -1
 -1
-13.0
+7.0
 1
 10
 1
@@ -228,10 +312,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
--16
-16
+-40
+40
+-40
+40
 0
 0
 1
@@ -323,10 +407,10 @@ NIL
 1
 
 MONITOR
-687
-41
-913
-86
+812
+35
+1038
+80
 Price to Fix Current Culvert
 [price-to-fix] of current-culvert
 17
@@ -349,6 +433,79 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+814
+108
+969
+153
+NIL
+[pycor] of current-culvert
+17
+1
+11
+
+MONITOR
+817
+175
+972
+220
+NIL
+[pxcor] of current-culvert
+17
+1
+11
+
+MONITOR
+808
+267
+1037
+312
+NIL
+count turtles with [stage-life-cycle = 3]
+17
+1
+11
+
+MONITOR
+810
+330
+1039
+375
+NIL
+count turtles with [stage-life-cycle = 2]
+17
+1
+11
+
+MONITOR
+810
+399
+1049
+444
+NIL
+count turtles with [stage-life-cycle = 1]
+17
+1
+11
+
+PLOT
+805
+483
+1005
+633
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count turtles"
 
 @#$#@#$#@
 ## WHAT IS IT?
