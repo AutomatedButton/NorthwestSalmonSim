@@ -3,6 +3,7 @@ globals[
   current-culvert ;; the currently selected culvert
   notes ;; string representing any notes about the game while it is being played
   time ;; int representing how many ticks have passed in this simulation
+  salmon-lifespan ;; int representing how many ticks a salmon can live at maximum
 
   ;; patch agentsets
   node ;; agentset containing patches that are nodes?
@@ -38,20 +39,25 @@ to setup
   create-turtles 10 [
     setup-fish
   ]
+  create-turtles 2 [
+    setup-fish
+    set stage-life-cycle 1
+  ]
   print node
   reset-ticks
 end
 
 to go
-  set money money + 1;
+  if time mod 52 = 0 [set money money + 50]
+  ;;set money money + 1;
   set time time + 1;
   ask turtles[ move-fish ];
-  ask turtles[ if age > 50 [ die ] ]
+  ask turtles[ if age > 200 [ die ] ]
   ask turtles[ fish-predation ]
  ;;Trying to get this working, need some way of getting a list containing each turtle
   (foreach filter [ x -> [is-laying-eggs = true] of x] [self] of turtles
     [ x ->
-      create-turtles 2 [
+      create-turtles 3 [
         set age 0;
         set stage-life-cycle 0;
         set is-laying-eggs false;
@@ -61,7 +67,7 @@ to go
   ask turtles[
     set is-laying-eggs false
     if personal-timer != -1 [ set personal-timer personal-timer - 1 ] ]
-  if time = 100 [print notes]
+  if time = 100 [output-print notes]
   tick
 end
 
@@ -82,10 +88,14 @@ to setup-patches
     (pycor >= -10 and pycor <= 1 and pxcor = 0)
     or (pxcor = 1 and (pycor = -8 or pycor = -7))
     or (pxcor = 2 and (pycor = -7 or pycor = -6))
+    or (pxcor = 2 and pycor >= -1 and pycor <= 1)
+    or (pxcor = 3 and pycor >= 1 and pycor <= 3)
     or (pxcor = 3 and pycor >= -6 and pycor <= -2)
     or (pxcor >= 3 and pxcor <= 5 and pycor = -5)
     or (pxcor >= 1 and pxcor <= 2 and pycor = -2)
     or (pxcor <= -1 and pxcor >= -2 and pycor = -5)
+    or (pxcor = 6 and pycor >= -1 and pycor <= 0)
+    or (pxcor = 7 and pycor >= 0 and pycor <= 2)
     or (pxcor <= -2 and pxcor >= -3 and pycor = -4)
     or (pxcor = -3 and pycor >= -3 and pycor <= -1)
     or (pxcor = -4 or pxcor = -2 and pycor = -1)
@@ -115,9 +125,14 @@ to setup-patches
 
   ;; Setting all culvert nodes brown
   ask node with [culvert? = true][
-    set pcolor brown;
+    set pcolor 35;
     set accessable? false;
   ]
+
+  ;; Setting up more difficult culverts
+  ask node with [(pycor = -4 and pxcor = -3) or (pycor = -5 and pxcor = 3)][
+    set price-to-fix 30;
+    set pcolor 32]
 end
 
 
@@ -126,6 +141,7 @@ to setup-fish
   set age 0;
   set stage-life-cycle 2;
   set is-laying-eggs false;
+  set color orange;
   put-on-empty-node
 end
 
@@ -146,6 +162,11 @@ to set-particular-nodes
   ]
   ask node with [
     (pycor = 1 and pxcor = 0)
+    or (pycor = 3 and pxcor = 5)
+    or (pycor = 1 and pxcor = -6)
+    or (pycor = 3 and pxcor = 3)
+    or (pycor = 2 and pxcor = -2)
+    or (pycor = 2 and pxcor = 7)
   ][
     set max-eggs 5;
     set pcolor black
@@ -183,9 +204,9 @@ to fix-culvert ;; patch procedure
     if money >= price-to-fix [
       set pcolor blue
       set culvert? false
+      set notes (word notes "culvert on " pycor "," pxcor " fixed on tick #" time " at a cost of " price-to-fix "\n")
       set money money - price-to-fix
       set price-to-fix 0
-      set notes (word notes "culvert on " pycor "," pxcor " fixed on tick #" time "\n")
     ]
   ]
 end
@@ -195,6 +216,7 @@ to move-fish ;; turtle procedure
   (ifelse stage-life-cycle = 0 [
     if age > 10 [
       set stage-life-cycle 1
+      set color green;
     ]
   ]
     ;; Movement rules for a fish going to to the base of the river system
@@ -202,6 +224,7 @@ to move-fish ;; turtle procedure
       ask self [ move-downstream ]
       if [depth] of patch-here = 0 [
         set stage-life-cycle 2
+        set color orange;
       ]
   ]
     ;; Movement rules for a fish going to try to lay eggs
@@ -210,6 +233,7 @@ to move-fish ;; turtle procedure
       if [current-eggs] of patch-here < [max-eggs] of patch-here [
         set is-laying-eggs true
         set stage-life-cycle 3
+        set color red;
       ]
   ]
     ;; Movement rules for a fish going to live the rest of its life after laying eggs
@@ -351,11 +375,11 @@ count node
 11
 
 MONITOR
-124
-89
-181
-134
-Money
+99
+90
+204
+135
+Available Budget
 money
 17
 1
@@ -446,10 +470,10 @@ NIL
 11
 
 MONITOR
-817
-175
-972
-220
+815
+169
+970
+214
 NIL
 [pxcor] of current-culvert
 17
@@ -457,10 +481,10 @@ NIL
 11
 
 MONITOR
-808
-267
-1037
-312
+1063
+33
+1292
+78
 NIL
 count turtles with [stage-life-cycle = 3]
 17
@@ -468,10 +492,10 @@ count turtles with [stage-life-cycle = 3]
 11
 
 MONITOR
-810
-330
-1039
-375
+1065
+96
+1294
+141
 NIL
 count turtles with [stage-life-cycle = 2]
 17
@@ -479,10 +503,10 @@ count turtles with [stage-life-cycle = 2]
 11
 
 MONITOR
-810
-399
-1049
-444
+1065
+165
+1304
+210
 NIL
 count turtles with [stage-life-cycle = 1]
 17
@@ -492,9 +516,37 @@ count turtles with [stage-life-cycle = 1]
 PLOT
 805
 483
-1005
-633
-plot 1
+1268
+774
+Salmon Population
+Weeks
+Population
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"Total" 1.0 0 -16777216 true "" "plot count turtles"
+"Younglings" 1.0 0 -11085214 true "" "plot count turtles with [stage-life-cycle = 1]"
+"Adults" 1.0 0 -13297659 true "" "plot count turtles with [stage-life-cycle = 2]"
+"Post-Spawners" 1.0 0 -2674135 true "" "plot count turtles with [stage-life-cycle = 3]"
+
+OUTPUT
+202
+594
+578
+713
+11
+
+PLOT
+804
+235
+1267
+475
+Available Budget
 NIL
 NIL
 0.0
@@ -505,7 +557,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count turtles"
+"default" 1.0 0 -16777216 true "" "plot money"
 
 @#$#@#$#@
 ## WHAT IS IT?
