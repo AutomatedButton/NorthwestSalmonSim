@@ -7,6 +7,19 @@ globals[
 
   ;; patch agentsets
   node ;; agentset containing patches that are nodes?
+
+  ;; life cycles enums
+  enum_lc_fry ;; life cycle enums
+  enum_lc_adult
+  enum_lc_spawner
+  enum_lc_postspawner
+  ;; budgets
+  con_budget_total  ;; total budegt available over the years
+  con_budget_annual ;; budget newly availabke each year
+  budget_total_spent ;; cumulative total spent over te years
+  budget_this_year ;; adjusted to keep money let than total
+  budget_exhausted ;; 1=true/0=false
+
 ]
 
 turtles-own[
@@ -30,11 +43,11 @@ patches-own[
 to setup
   clear-all;
   set-default-shape turtles "fish"
-  set-patch-size 7;
-  resize-world -40 40 -40 40;
+  set-patch-size 14;
+  resize-world -20 20 -20 20;
   setup-globals
   setup-patches
-  ask node with [pycor = -9 and pxcor = 0][become-current]
+  ask node with [pycor = -7 and pxcor = 0][become-current]
   ;; Create all of the turtles
   create-turtles 10 [
     setup-fish
@@ -48,7 +61,19 @@ to setup
 end
 
 to go
-  if time mod 52 = 0 [set money money + 50]
+  if time mod 52 = 0 [  ;; annual budget increase
+    if budget_exhausted = 0
+    [     ;; not exhausted yet
+      set budget_this_year con_budget_annual;
+      if budget_total_spent + budget_this_year >= con_budget_total
+        [
+        set budget_this_year  con_budget_total - budget_total_spent;
+        set notes (word notes "total budget of " con_budget_total  " is exhausted on week #" time  ". Lets hope we have done enough.\n");  ;; impose total budget
+        set budget_exhausted 1;
+        ]
+      set money money + budget_this_year;
+    ] ;; is budget exhausted
+  ]
   ;;set money money + 1;
   set time time + 1;
   ask turtles[ move-fish ];
@@ -68,6 +93,14 @@ to go
     set is-laying-eggs false
     if personal-timer != -1 [ set personal-timer personal-timer - 1 ] ]
   if time = 100 [output-print notes]
+  if time = 251 [print "Time's Up"
+    stop]
+  if count turtles = 0 [set notes (word notes "Game Over: All the fish have died.  You did your best. \n");
+    stop]
+  if count turtles >= 500 [set notes (word notes "Game Over! Fish population has reached a sustainable population of 500. Well done!  \n");
+    stop]
+  if time = 250 [set notes (word notes "Game Over: Reached time limit of 250 weeks.  You kept them alive! \n");
+    stop]
   tick
 end
 
@@ -86,13 +119,13 @@ to setup-patches
   ;; Set which tiles are nodes
   set node patches with [
     (pycor >= -10 and pycor <= 1 and pxcor = 0)
-    or (pxcor = 1 and (pycor = -8 or pycor = -7))
+    or (pxcor = 1 and pycor = -7)or (pycor = -7 and (pxcor <= -3 and pxcor >= -4))
     or (pxcor = 2 and (pycor = -7 or pycor = -6))
     or (pxcor = 2 and pycor >= -1 and pycor <= 1)
     or (pxcor = 3 and pycor >= 1 and pycor <= 3)
     or (pxcor = 3 and pycor >= -6 and pycor <= -2)
     or (pxcor >= 3 and pxcor <= 5 and pycor = -5)
-    or (pxcor >= 1 and pxcor <= 2 and pycor = -2)
+    or (pxcor = 2 and pycor = -2)
     or (pxcor <= -1 and pxcor >= -2 and pycor = -5)
     or (pxcor = 6 and pycor >= -1 and pycor <= 0)
     or (pxcor = 7 and pycor >= 0 and pycor <= 2)
@@ -104,6 +137,10 @@ to setup-patches
     or (pxcor = -2 and pycor >= 0 and pycor <= 2)
     or ((pxcor >= -2 and pxcor <= 2) and (pycor >= -11 and pycor <= -10))
     or (pxcor = 5 and pycor >= -4 and pycor <= 3)
+    or (pxcor <= 15 and pxcor >= -15 and pycor <= -10)
+    or (pycor = -8 and (pxcor <= -1 and pxcor >= -3))
+    or (pycor = -7 and (pxcor <= -3 and pxcor >= -4))
+    or (pycor = -6 and (pxcor <= -4 and pxcor >= -5))
   ]
 
   ;; Setting up baselines for every node
@@ -125,14 +162,14 @@ to setup-patches
 
   ;; Setting all culvert nodes brown
   ask node with [culvert? = true][
-    set pcolor 35;
+    set pcolor 30;
     set accessable? false;
   ]
 
   ;; Setting up more difficult culverts
   ask node with [(pycor = -4 and pxcor = -3) or (pycor = -5 and pxcor = 3)][
     set price-to-fix 30;
-    set pcolor 32]
+    set pcolor 35]
 end
 
 
@@ -148,7 +185,7 @@ end
 to set-particular-nodes
 
   ask node with [
-    (pycor = -9 and pxcor = 0)
+    (pycor = -7 and pxcor = 0)
   or (pycor = -5 and pxcor = 3)
   or (pycor = 0 and pxcor = 0)
   or (pycor = -3 and pxcor = 0)
@@ -167,9 +204,10 @@ to set-particular-nodes
     or (pycor = 3 and pxcor = 3)
     or (pycor = 2 and pxcor = -2)
     or (pycor = 2 and pxcor = 7)
+    or (pycor = -6 and pxcor = -5)
   ][
     set max-eggs 5;
-    set pcolor black
+    set pcolor yellow
   ]
 
 end
@@ -180,7 +218,7 @@ to choose-current
     let y-mouse mouse-ycor
     ask current-culvert [
       ask patch-at -1 1 [ set plabel "" ] ;; unlabel the current intersection (because we've chosen a new one)
-      ifelse culvert? [ set pcolor brown ][ set pcolor blue ]
+      ifelse culvert? [ set pcolor black ][ set pcolor blue ]
     ]
     ask min-one-of node [ distancexy x-mouse y-mouse ] [
       become-current
@@ -201,13 +239,13 @@ end
 
 to fix-culvert ;; patch procedure
   ask current-culvert [
-    if money >= price-to-fix [
+    ifelse money >= price-to-fix [
       set pcolor blue
       set culvert? false
       set notes (word notes "culvert on " pycor "," pxcor " fixed on tick #" time " at a cost of " price-to-fix "\n")
       set money money - price-to-fix
       set price-to-fix 0
-    ]
+    ][beep]
   ]
 end
 
@@ -322,11 +360,11 @@ end
 GRAPHICS-WINDOW
 210
 10
-785
-586
+792
+593
 -1
 -1
-7.0
+14.0
 1
 10
 1
@@ -336,10 +374,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--40
-40
--40
-40
+-20
+20
+-20
+20
 0
 0
 1
@@ -375,10 +413,10 @@ count node
 11
 
 MONITOR
-99
-90
-204
-135
+87
+355
+192
+400
 Available Budget
 money
 17
@@ -414,10 +452,10 @@ count turtles
 11
 
 BUTTON
-17
-222
-126
-255
+95
+214
+204
+247
 Select Culvert
 choose-current
 T
@@ -431,10 +469,10 @@ NIL
 1
 
 MONITOR
-812
-35
-1038
-80
+813
+36
+956
+81
 Price to Fix Current Culvert
 [price-to-fix] of current-culvert
 17
@@ -442,10 +480,10 @@ Price to Fix Current Culvert
 11
 
 BUTTON
-19
-271
-107
-304
+105
+254
+193
+287
 NIL
 fix-culvert
 NIL
@@ -459,10 +497,10 @@ NIL
 1
 
 MONITOR
-814
-108
-969
-153
+813
+91
+968
+136
 NIL
 [pycor] of current-culvert
 17
@@ -470,10 +508,10 @@ NIL
 11
 
 MONITOR
-815
-169
-970
-214
+814
+143
+969
+188
 NIL
 [pxcor] of current-culvert
 17
@@ -481,33 +519,33 @@ NIL
 11
 
 MONITOR
-1063
-33
-1292
-78
-NIL
+986
+35
+1076
+80
+# Post Spawners
 count turtles with [stage-life-cycle = 3]
 17
 1
 11
 
 MONITOR
-1065
-96
-1294
-141
-NIL
+986
+91
+1075
+136
+# Spawners
 count turtles with [stage-life-cycle = 2]
 17
 1
 11
 
 MONITOR
-1065
-165
-1304
-210
-NIL
+986
+144
+1075
+189
+# Younglings
 count turtles with [stage-life-cycle = 1]
 17
 1
@@ -533,12 +571,13 @@ PENS
 "Younglings" 1.0 0 -11085214 true "" "plot count turtles with [stage-life-cycle = 1]"
 "Adults" 1.0 0 -13297659 true "" "plot count turtles with [stage-life-cycle = 2]"
 "Post-Spawners" 1.0 0 -2674135 true "" "plot count turtles with [stage-life-cycle = 3]"
+"Sustainable Pop" 1.0 0 -1184463 true "" "plot 500"
 
 OUTPUT
-202
-594
-578
-713
+223
+645
+770
+764
 11
 
 PLOT
@@ -558,6 +597,70 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot money"
+
+TEXTBOX
+75
+332
+225
+350
+Budget and Spending
+13
+0.0
+1
+
+MONITOR
+87
+408
+198
+453
+NIL
+con_budget_total
+17
+1
+11
+
+MONITOR
+87
+457
+198
+502
+NIL
+budget_this_year
+17
+1
+11
+
+MONITOR
+87
+507
+208
+552
+Total Spent to Date
+budget_total_spent
+17
+1
+11
+
+MONITOR
+86
+560
+204
+605
+NIL
+budget_exhausted
+17
+1
+11
+
+TEXTBOX
+816
+14
+966
+32
+Culverts
+14
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
