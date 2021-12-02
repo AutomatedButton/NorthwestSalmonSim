@@ -1,7 +1,7 @@
 ;; Culvert Barrier Removal Educational Tool
 ;; Developed by Ben Pomeroy and Philip Murphy 2021
 ;; This Version -- an XX == Out of synch == version by Philip 9/10/2021
-
+extensions [Sound]
 globals[
   money ;; int representing how much money (funds) the player has to spend on fixing culverts
   current-culvert ;; the currently selected culvert
@@ -95,6 +95,7 @@ to setup
   ]
   print node
   reset-ticks
+
 end
 
 to go
@@ -105,13 +106,14 @@ to go
     if budget_exhausted = 0  ; Not yet exhausted
     [
       set budget_this_year con_budget_annual;
+      sound:play-sound "mixkit-clinking-coins-1993.wav"
       if budget_total_spent + budget_this_year >= con_budget_total
         [
         set budget_this_year  con_budget_total - budget_total_spent;
         set notes (word notes "total budget of " con_budget_total  " is exhausted on week #" time  ". Lets hope we have done enough.\n");  ;; impose total budget
         set budget_exhausted 1; ; Budget officially exhausted for this game
         ]
-      ; Check cash in hand -- this can exceed Total budeget if the user doesn't fix any culverts, and  budget_total_spent + budget_this_year < con_budget_total
+      ; Check cash in hand -- this can exceed Total budget if the user doesn't fix any culverts, and  budget_total_spent + budget_this_year < con_budget_total
       ifelse money + budget_this_year > con_budget_total
         [set money con_budget_total]
         [set money money + budget_this_year]
@@ -361,7 +363,7 @@ end
 
 to fix-culvert ;; patch procedure
   ask current-culvert [
-    if money >= price-to-fix [
+    ifelse money >= price-to-fix [
       set pcolor blue
       set culvert? false
       set notes (word notes "culvert on " pycor "," pxcor " fixed on tick #" time " at a cost of " price-to-fix "\n")
@@ -369,6 +371,8 @@ to fix-culvert ;; patch procedure
       set culverts_fixed culverts_fixed + 1
       set budget_total_spent budget_total_spent + price-to-fix
       set price-to-fix 0
+    ][
+      sound:play-sound "mixkit-game-show-buzz-in-3090.wav"
     ]
   ]
 end
@@ -522,11 +526,11 @@ GRAPHICS-WINDOW
 20
 -20
 20
-1
-1
+0
+0
 1
 ticks
-30.0
+1.0
 
 BUTTON
 15
@@ -557,11 +561,11 @@ count node
 11
 
 MONITOR
-753
-48
-864
-93
-Available funds
+1233
+41
+1344
+86
+Available Budget
 money
 17
 1
@@ -585,15 +589,32 @@ NIL
 0
 
 MONITOR
-1228
-449
-1365
-494
+1226
+478
+1363
+523
 Total Salmon Population
 count turtles
 17
 1
 11
+
+BUTTON
+8
+198
+123
+231
+Select a Culvert
+choose-current
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
 
 MONITOR
 5
@@ -606,32 +627,49 @@ Price to Fix Current Culvert
 1
 11
 
+BUTTON
+9
+240
+122
+273
+Fix the Culvert
+fix-culvert
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
+
 MONITOR
-1228
-502
-1368
-547
-# Post-Spawners (LC=4)
-count turtles with [stage-life-cycle = 4]
+1224
+551
+1362
+596
+# Post-Spawners (LC=3)
+count turtles with [stage-life-cycle = 3]
 17
 1
 11
 
 MONITOR
-1229
-552
-1367
-597
-# Spawners (LC=3)
-count turtles with [stage-life-cycle = enum_lcs_spawner]
+1225
+600
+1363
+645
+# Spawners (LC=2)
+count turtles with [stage-life-cycle = 2]
 17
 1
 11
 
 MONITOR
-1230
+1224
 650
-1368
+1362
 695
 #Smolt (LC=1)
 count turtles with [stage-life-cycle = 1]
@@ -641,7 +679,7 @@ count turtles with [stage-life-cycle = 1]
 
 PLOT
 751
-351
+375
 1214
 744
 Salmon Population
@@ -655,13 +693,12 @@ true
 true
 "" ""
 PENS
-"Total - - -" 1.0 2 -16777216 true "" "plot count turtles"
-"Fry" 1.0 0 -4079321 true "" "plot count turtles with [stage-life-cycle = enum_lcs_fry]"
-"Smolt" 1.0 0 -11221820 true "" "plot count turtles with [stage-life-cycle = enum_lcs_smolt]"
-"Adult" 1.0 0 -5207188 true "" "plot count turtles with [stage-life-cycle = enum_lcs_adult]"
-"Spawners" 1.0 0 -2674135 true "" "plot count turtles with [stage-life-cycle = enum_lcs_spawner]"
-"Post-Spawners" 1.0 0 -9276814 true "" "plot count turtles with [stage-life-cycle = enum_lcs_postspawner]"
-"Sustainable pop" 1.0 2 -14439633 true "" "plot fish_population_win"
+"Total" 1.0 0 -16777216 true "" "plot count turtles"
+"Younglings" 1.0 0 -11085214 true "" "plot count turtles with [stage-life-cycle = 0]"
+"Smolt" 1.0 0 -13345367 true "" "plot count turtles with [stage-life-cycle = 1]"
+"Spawners" 1.0 0 -2674135 true "" "plot count turtles with [stage-life-cycle = 2]"
+"Post-Spawners" 1.0 0 -7500403 true "" "plot count turtles with [stage-life-cycle = 3]"
+"Sustainable population" 1.0 0 -1184463 true "" "plot fish_population_win"
 
 OUTPUT
 142
@@ -671,10 +708,10 @@ OUTPUT
 11
 
 PLOT
-909
-43
-1372
-305
+752
+41
+1215
+333
 Available Budget
 weeks
 available budget
@@ -689,11 +726,11 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot money"
 
 MONITOR
-1230
+1224
 699
-1368
+1362
 744
-# Fry (LC=0)
+# Younglings (LC=0)
 count turtles with [stage-life-cycle = 0]
 0
 1
@@ -710,10 +747,10 @@ Culverts
 1
 
 MONITOR
-751
-209
-871
-254
+1231
+202
+1342
+247
 Total Spent to date
 budget_total_spent
 17
@@ -721,10 +758,10 @@ budget_total_spent
 11
 
 MONITOR
-0
-640
-118
-685
+1232
+253
+1340
+298
 NIL
 budget_exhausted
 17
@@ -732,32 +769,32 @@ budget_exhausted
 11
 
 MONITOR
-752
-104
-863
-149
-Total  Budget
+1232
+97
+1343
+142
+Total Budget
 con_budget_total
 17
 1
 11
 
 MONITOR
-751
-159
-872
-204
-funds added this year
+1231
+152
+1342
+197
+NIL
 budget_this_year
 17
 1
 11
 
 MONITOR
-1228
-373
-1366
-422
+1227
+396
+1365
+445
 Sustainable Population
 fish_population_win
 17
@@ -775,132 +812,71 @@ Budget and Spending
 1
 
 TEXTBOX
-755
-327
-905
-347
+753
+348
+903
+368
 Salmon Population
 16
 0.0
 1
 
 TEXTBOX
-1230
-347
-1380
-365
+1229
+370
+1379
+388
 Target
 14
 0.0
 1
 
 TEXTBOX
-1227
-428
-1358
-446
+1230
+457
+1361
+475
 Current
 14
 0.0
 1
 
-MONITOR
-9
-202
-141
-247
-# Culverts Fixed
-culverts_fixed
-17
-1
-11
-
-MONITOR
-8
-257
-139
-302
-Total # of Culverts
-culverts_total
-17
-1
-11
-
-MONITOR
-1228
-599
-1367
-644
-# Adults (LC=2)
-count turtles with [stage-life-cycle = enum_lcs_adult]
-17
-1
-11
-
-TEXTBOX
-2
-619
-152
-637
-Debugging only:
-11
-0.0
-1
-
 @#$#@#$#@
 ## WHAT IS IT?
-Culverts are used to span small rivers and streams throughout the Pacific Northwest. Removing culverts that are blocking fish passage can help restore salmon populations.
 
-This simulation model shows how tricky it can be to decide which blocking culverts to fix each year when funds are limited and only a fixed amount is available each year. 
+This model is to show how removing culverts that are blocking fish passage can help restore salmon populations.
 
 ## HOW IT WORKS
 
-The agents are salmon.  Pacific salmon have an amazing multi-stage life cycle. They emerge from eggs laid in gravel and quickly become fry (yellow).  The fry move around the streams and rivers growing until they turn into smolt (blue).  The smolt transition from fresh water to salt water fish, and travel down and out into the ocean.  There they grow into adults (brown), fattening up until the become spawners (red) at which point they head back to the river system to find spawning grounds (yellow patches) where they can lay their eggs.  So this life cycle can start again.  
-
-But many of the pathways for spawners returning from the ocean are clocked by badly designed or failing culverts.  Culverts are the brown and black patches blocking fish passage on the rivers.  You need to remove those blockages so that spawners can swim up river and female spawners lay their eggs so that the popultion can survive, even grow.  
-
-You need funds to clear a blockage - 15m for brown ones, 30m for the black ones.  New funds (50m) are provided to you each year.  If you select a culvert to fix but don't have enough funds, nothing will happen.  You'll need to wait for the following years funding.
-
-The goal is to make enough spwaning areas accessible so the fish population can grow, and reach a sustainable level -- a Total population of 100 fish. Each time step in the simulation is a week.  The fish die through predation (about 1% of the population per tic)  and old age (at about 4 years).  So you need to move fast.   
-
+(what rules the agents use to create the overall behavior of the model)
 
 ## HOW TO USE IT
 
-Click on any culvert (the black and brown blockages in the streams), and hold the mouse down.  The blocked culvert will turn red to show it is selected, and then, if you have the funds to clear it,  will dissappear to show the blockage is removed.  If spawners were able to reach that blockage, now they will be able to travel upstream to spawning grounds where they can lay their eggs and bring a new generation into existence.  Unless there is another blocking culvert upstream.
- 
+(how to use the model, including a description of each of the items in the Interface tab)
 
 ## THINGS TO NOTICE
-The amount of funds you have available are shown on the upper right of the page.  The funds needed to fix any culvert you select are also shown there.  You see the total budget available over the years is 100m.  Available funds shows you how much you have to work with at any given time.  You'll need to spend that wisely each year.
 
-
-In the lower right, you can see how many fish there are in each life stage - fry, smolt, adult, spawner, post spawners. 
+(suggested things for the user to notice while running the model)
 
 ## THINGS TO TRY
- 
 
-Try choosing culverts to fix first that will open up pathways to the spawning grounds (yellow) patches as soon as possible.   Keep in mind that the black culverts are more expensive to fix than the brown ones.
+(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
 
 ## EXTENDING THE MODEL
 
-You might add hatcheries to add more smolt to the population.
-
-In phase two of this modeling effort, we will add climate change related inpacts and rearing habitat where fry will need to migrate to better surbive in the rivr system.
-
+(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
 
 ## NETLOGO FEATURES
 
-How the fish move depends on their life stage.  Smolt swim mainly downstream and out into the ocean, and spawners swim back to the estuary, then upstream looking for spwaning grounds.
+(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
 
 ## RELATED MODELS
 
-NOAA has a board game: Salmon Survival Game
-https://www.fisheries.noaa.gov/resource/educational-materials/salmon-survival-game
-
+(models in the NetLogo Models Library and elsewhere which are of related interest)
 
 ## CREDITS AND REFERENCES
-Developed by Ben Pomeroy and Philip Murphy 2021
 
-See https://decisioncafe.com/sandbox/culvert_cleanup.html
+(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
 @#$#@#$#@
 default
 true
